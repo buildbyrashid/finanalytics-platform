@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    config:
+      enabled: false
+
+server:
+  port: 8080
+

@@ -2,6 +2,10 @@ version: "3.8"
 
 services:
 
+  # ======================================================
+  # INFRASTRUCTURE
+  # ======================================================
+
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     environment:
@@ -22,18 +26,6 @@ services:
     ports:
       - "9092:9092"
 
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: finanalytics
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-
   redis:
     image: redis:latest
     ports:
@@ -51,6 +43,71 @@ services:
     volumes:
       - minio-data:/data
 
+  # ======================================================
+  # POSTGRES DATABASES (Separate per microservice)
+  # ======================================================
+
+  postgres-auth:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+
+  postgres-transaction:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: transaction_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-transaction-data:/var/lib/postgresql/data
+
+  postgres-parser:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: parser_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-parser-data:/var/lib/postgresql/data
+
+  postgres-categorizer:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: categorizer_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-categorizer-data:/var/lib/postgresql/data
+
+  postgres-analytics:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: analytics_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-analytics-data:/var/lib/postgresql/data
+
+  # Upload service does NOT need a DB
+
+  # ======================================================
+  # PYTHON OCR SERVICE
+  # ======================================================
+
   ocr-service:
     build: ./services/ocr-service
     depends_on:
@@ -61,22 +118,40 @@ services:
     volumes:
       - ./uploads:/app/uploads
 
+  # ======================================================
+  # NODE SERVICES
+  # ======================================================
+
   parser-service:
     build: ./services/parser-service
     depends_on:
       - kafka
+      - postgres-parser
     environment:
       KAFKA_BROKER: kafka:9092
+      DB_HOST: postgres-parser
+      DB_NAME: parser_db
+      DB_USER: admin
+      DB_PASSWORD: admin
 
   categorizer-service:
     build: ./services/categorizer-service
     depends_on:
       - kafka
       - redis
+      - postgres-categorizer
     environment:
       KAFKA_BROKER: kafka:9092
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      DB_HOST: postgres-categorizer
+      DB_NAME: categorizer_db
+      DB_USER: admin
+      DB_PASSWORD: admin
+
+  # ======================================================
+  # SPRING BOOT SERVICES
+  # ======================================================
 
   api-gateway:
     build: ./services/api-gateway
@@ -91,9 +166,9 @@ services:
   auth-service:
     build: ./services/auth-service
     depends_on:
-      - postgres
+      - postgres-auth
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/finanalytics
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/auth_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
 
@@ -109,9 +184,9 @@ services:
     build: ./services/transaction-service
     depends_on:
       - kafka
-      - postgres
+      - postgres-transaction
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/finanalytics
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-transaction:5432/transaction_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       KAFKA_BROKER: kafka:9092
@@ -121,11 +196,23 @@ services:
     depends_on:
       - kafka
       - redis
+      - postgres-analytics
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-analytics:5432/analytics_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       KAFKA_BROKER: kafka:9092
 
+# ======================================================
+# VOLUMES
+# ======================================================
+
 volumes:
-  postgres-data:
+  postgres-auth-data:
+  postgres-transaction-data:
+  postgres-parser-data:
+  postgres-categorizer-data:
+  postgres-analytics-data:
   minio-data:
