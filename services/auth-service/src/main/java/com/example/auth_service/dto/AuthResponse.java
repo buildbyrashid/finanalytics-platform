@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
+@AllArgsConstructor
 public class AuthResponse {
     private String message;
     private String token;
