@@ -171,6 +171,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/auth_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
+    ports:
+      - "8081:8081"
 
   upload-service:
     build: ./services/upload-service
